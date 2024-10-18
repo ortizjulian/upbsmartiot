@@ -1,57 +1,7 @@
-// #include <Arduino.h>
-// #include <SPI.h>
-// #include <LoRa.h>
-
-// #define SCK 5
-// #define MISO 19
-// #define MOSI 27
-// #define SS 18
-// #define RST 23
-// #define DIO 26
-// #define BAND 915E6
-
-// int contador = 0;
-// void setup() {
-//   Serial.begin(115200);
-//   SPI.begin(SCK,MISO,MOSI,SS);
-//   LoRa.setPins(SS,RST,DIO);
-//   if (!LoRa.begin(915E6))
-//   {
-//     Serial.print("No inicio el radio");
-//     while (1);
-//   }
-//   Serial.print("Radio inicializado exitosamente");
-//   LoRa.setFrequency(915E6);
-// }
-
-// void loop() {
-//   int a;
-//   while(LoRa.beginPacket() == 0)
-//   {
-//     Serial.print("esperando por el radio...");
-//     delay(100);
-//   }
-//   Serial.print("enviando data");
-//   Serial.println(contador);
-
-//   LoRa.beginPacket();
-//   Serial.println("incio paquete");
-//   LoRa.print("hola");
-//   Serial.println("escribio hola");
-//   LoRa.print(contador);
-//   Serial.println("incremetno contador");
-//   a = LoRa.endPacket();
-//   if (a) Serial.println("transmision exitosa");
-//   else Serial.println("error de tx");
-//   Serial.println("termino paquete");
-//   contador++;
-
-//   delay(1000);
-// }
-
-// Only supports SX1276/SX1278
 #include <LoRa.h>
 #include "LoRaBoards.h"
+#include "ClosedCube_HDC1080.h"
+#include <TinyGPSPlus.h>
 
 #ifndef CONFIG_RADIO_FREQ
 #define CONFIG_RADIO_FREQ           915.0
@@ -69,6 +19,24 @@
 #endif
 
 int counter = 0;
+
+ClosedCube_HDC1080 sensor;
+//Cantidad de medidas de temperatura y humedad
+const int count_i = 3;
+
+float temperatures[count_i] = {};
+float temp = 0;
+
+float humidities[count_i] = {};
+float humidity = 0;
+
+//GPS
+TinyGPSPlus gps;
+
+void getHumidity();
+void getTemperature();
+float getMean(float measures[]);
+static void smartDelay(unsigned long ms);
 
 void setup()
 {
@@ -103,27 +71,84 @@ void setup()
     LoRa.disableInvertIQ();
 
     LoRa.setCodingRate4(7);
+    
+    Wire.begin(0,4);
+    delay(100);
+    Serial.begin(115200);
+    delay(100);
+    sensor.begin(0x40);
+    delay(100);
+    Serial1.begin(9600, SERIAL_8N1, 34, 12);
+    
 }
 
 void loop()
 {
-    Serial.print("Sending packet: ");
-    Serial.println(counter);
 
+    getTemperature();
+    getHumidity();
+
+    String message = "{\"id\": \"point16\" , \"lat\":" + String(gps.location.lat(), 6) + ", \"lon\":" + String(gps.location.lng(), 6) + ", \"temperatura\":" + String(temp) +", \"humedad\":" + String(humidity) + "}";
+    Serial.println(message);
     // send packet
     LoRa.beginPacket();
-    LoRa.print("hello ");
-    LoRa.print(counter);
+    LoRa.print(message);
     LoRa.endPacket();
 
-    if (u8g2) {
-        char buf[256];
-        u8g2->clearBuffer();
-        u8g2->drawStr(0, 12, "Transmitting: OK!");
-        snprintf(buf, sizeof(buf), "Sending: %d", counter);
-        u8g2->drawStr(0, 30, buf);
-        u8g2->sendBuffer();
-    }
-    counter++;
     delay(5000);
+}
+
+
+void getHumidity(){
+  //Chirp de humedad
+  float auxHumidity = 0;
+  for (int i = 0; i < count_i; i++)
+  {
+    auxHumidity = sensor.readHumidity();
+    smartDelay(100);
+    humidities[i] = auxHumidity;
+  }
+   //Pruning humedad
+  float mean = getMean(humidities);
+  humidity = mean;
+}
+ 
+void getTemperature(){
+  //Chirp de temperatura
+  float auxTemp = 0;
+  for (int i = 0; i < count_i; i++)
+  {
+    auxTemp = sensor.readTemperature();
+    smartDelay(100);
+    temperatures[i] = auxTemp;
+  }
+ //Pruning temperatura
+  float mean = getMean(temperatures);
+ 
+  temp= mean;
+}
+//Función para el pruning
+float getMean(float measures[]){
+ 
+  float total = 0;
+ 
+  for (int i = 0; i < count_i; i++)
+  {
+    total += measures[i];
+  }
+ 
+  return (total/count_i);
+ 
+}
+ 
+static void smartDelay(unsigned long ms)
+{
+  
+  unsigned long start = millis();
+  do
+  {
+    while (Serial1.available())
+      gps.encode(Serial1.read());
+  } while (millis() - start < ms);
+  
 }
