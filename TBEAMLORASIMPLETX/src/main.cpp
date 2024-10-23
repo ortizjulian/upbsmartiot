@@ -1,6 +1,6 @@
 #include <LoRa.h>
 #include "LoRaBoards.h"
-#include "ClosedCube_HDC1080.h"
+#include <ClosedCube_HDC1080.h>
 #include <TinyGPSPlus.h>
 
 #ifndef CONFIG_RADIO_FREQ
@@ -40,6 +40,12 @@ static void smartDelay(unsigned long ms);
 
 void setup()
 {
+    sensor.begin(0x40);
+    delay(100);
+    Serial.begin(115200);
+    delay(100);
+    Serial1.begin(9600, SERIAL_8N1, 34, 12);
+    delay(100);
     setupBoards();
     // When the power is turned on, a delay is required.
     delay(1500);
@@ -72,14 +78,6 @@ void setup()
 
     LoRa.setCodingRate4(7);
     
-    Wire.begin(0,4);
-    delay(100);
-    Serial.begin(115200);
-    delay(100);
-    sensor.begin(0x40);
-    delay(100);
-    Serial1.begin(9600, SERIAL_8N1, 34, 12);
-    
 }
 
 void loop()
@@ -88,14 +86,14 @@ void loop()
     getTemperature();
     getHumidity();
 
-    String message = "{\"id\": \"point16\" , \"lat\":" + String(gps.location.lat(), 6) + ", \"lon\":" + String(gps.location.lng(), 6) + ", \"temperatura\":" + String(temp) +", \"humedad\":" + String(humidity) + "}";
+    String message = "julianor${\"lat\": {\"value\":" + String(gps.location.lat(), 6) + "} ,\"lon\": {\"value\":" + String(gps.location.lng(), 6) + "} , \"temp\": {\"value\":" + String(temp) + "} ,\"humedad\": {\"value\":" + String(humidity) + "}}";
     Serial.println(message);
     // send packet
     LoRa.beginPacket();
     LoRa.print(message);
     LoRa.endPacket();
 
-    delay(5000);
+    delay(300000);
 }
 
 
