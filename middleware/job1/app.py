@@ -13,7 +13,7 @@ def fetch_data():
     cursor = connection.cursor()
     try:
         query = """
-        SELECT time_index, valor_temp, valor_humedad
+        SELECT time_index, temp, humedad
         FROM "doc"."etvariables"
         WHERE entity_id = 'julianor'
           AND time_index >= NOW() - INTERVAL '1 DAYS'
@@ -21,7 +21,7 @@ def fetch_data():
         """
         cursor.execute(query)
         rows = cursor.fetchall()
-        
+        print(rows)
         df = pd.DataFrame(rows, columns=['timestamp', 'valor_temp', 'valor_humedad'])
         df= remove_outliners(df)
 
@@ -31,17 +31,18 @@ def fetch_data():
         cursor.close()
         connection.close()
 
-def remove_outliers(df):
-    df = df[(df['valor_temp'] <= 100) & (df['valor_humedad'] <= 100)]
+def remove_outliners(df):
+    df = df[(df['valor_temp'] > 0) & (df['valor_temp'] < 100) &
+             (df['valor_humedad'] > 0) & (df['valor_humedad'] < 100)]
     return df
 
 
 def save_predictions(predictions_temp, predictions_humedad):
     conn = psycopg2.connect(
-        dbname='nombre_base_datos',
-        user='tu_usuario',
-        password='tu_contraseña',
-        host='localhost',
+        dbname='data_front',
+        user='julian',
+        password='123',
+        host='postgres',
         port='5432'
     )
     cursor = conn.cursor()
@@ -80,10 +81,10 @@ data_temp = pd.DataFrame({'t': tiempo_temp, 'y': temperatura})
 data_humedad = pd.DataFrame({'t': tiempo_temp, 'y': humedad})
 
 steps = 1  
-
+max_lags = min(5, len(data_temp) - 1)
 forecaster_temp = ForecasterAutoreg(
     regressor=RandomForestRegressor(random_state=123),
-    lags=125
+    lags=max_lags
 )
 
 forecaster_temp.fit(y=data_temp['y'])
@@ -92,7 +93,7 @@ predictions_temp = forecaster_temp.predict(steps=steps)
 
 forecaster_humedad = ForecasterAutoreg(
     regressor=RandomForestRegressor(random_state=123),
-    lags=125
+    lags=max_lags
 )
 
 forecaster_humedad.fit(y=data_humedad['y'])

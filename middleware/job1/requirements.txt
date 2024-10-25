@@ -1,0 +1,6 @@
+crate
+pandas
+numpy
+scikit-learn
+skforecast
+psycopg2-binary

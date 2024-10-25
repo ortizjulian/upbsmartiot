@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  postgres:
+    build:
+      context: ./job1
+      dockerfile: dockerfile-db
+    environment:
+      POSTGRES_DB: data_front
+      POSTGRES_USER: julian
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./job1/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  cron:
+    build:
+      context: ./job1
+      dockerfile: dockerfile-app
+    depends_on:
+      - postgres

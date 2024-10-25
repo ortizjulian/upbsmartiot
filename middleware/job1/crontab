@@ -1,0 +1,5 @@
+# START CRON JOB
+PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PYTHONPATH=/usr/local/lib/python3.10/site-packages
+* * * * * root python3 /app/app.py >> /app/daily-backup.log 2>&1
+# END CRON JOB
