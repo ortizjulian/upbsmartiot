@@ -14,7 +14,7 @@
 const char* ssid = "UPBWiFi";
  
 const char* host = "10.38.32.137";
-const uint16_t port = 1026;
+const uint16_t port = 8080;
  
 WiFiClient client;
  
@@ -24,7 +24,7 @@ void setup()
     // When the power is turned on, a delay is required.
     delay(1500);
  
-    Serial.println("LoRa Receiver");
+    //Serial.println("LoRa Receiver");
  
 #ifdef  RADIO_TCXO_ENABLE
     pinMode(RADIO_TCXO_ENABLE, OUTPUT);
@@ -33,7 +33,7 @@ void setup()
  
     LoRa.setPins(RADIO_CS_PIN, RADIO_RST_PIN, RADIO_DIO0_PIN);
     if (!LoRa.begin(CONFIG_RADIO_FREQ * 1000000)) {
-        Serial.println("Starting LoRa failed!");
+        //Serial.println("Starting LoRa failed!");
         while (1);
     }
  
@@ -61,7 +61,7 @@ void setup()
  
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.print(".");
+        //Serial.print(".");
     }
 }
  
@@ -74,7 +74,7 @@ void loop()
  
     if (packetSize) {
         // received a packet
-        Serial.print("Received packet '");
+        //Serial.print("Received packet '");
  
         String recv = "";
  
@@ -89,12 +89,12 @@ void loop()
             jsonData = recv.substring(separatorIndex + 1);
         }
         else {
-            Serial.println("Separator '$' not found in received data.");
+            //Serial.println("Separator '$' not found in received data.");
             return; // Salir si no se encuentra el separador
         }
          
         if (client.connect(host, port)){
-            Serial.println("connected");
+            //Serial.println("connected");
             client.println("PATCH /v2/entities/" +nombre + "/attrs HTTP/1.1");
             client.println("Host: 10.38.32.137");
             client.println("Content-Type: application/json");
@@ -103,7 +103,7 @@ void loop()
             client.println(jsonData);
         }
         else {
-            Serial.println("connection failed");
+            //Serial.println("connection failed");
         }
  
     }
