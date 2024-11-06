@@ -13,6 +13,18 @@ app = dash.Dash(__name__)
 db_url = 'crate://10.38.32.137:8083/'
 engine = create_engine(db_url)
 
+username = 'julian'
+password = '123'
+host = 'postgres'
+port = '5432'
+database = 'data_front'
+
+# Construye la URL de conexión
+db_url_postgresql = f'postgresql://{username}:{password}@{host}:{port}/{database}'
+
+# Crea el motor de la base de datos
+engine_postgresql = create_engine(db_url_postgresql)
+
 # Consulta de datos históricos desde CrateDB
 def get_data(selected_date=None):
     query = """
@@ -102,7 +114,7 @@ def get_prediction_data():
     """
 
     try:
-        data = pd.read_sql(query, con=engine, timeout=5)
+        data = pd.read_sql(query, con=engine_postgresql, timeout=5)
     except Exception as e:
         data = pd.DataFrame()  # Retornar un DataFrame vacío en caso de error
 
