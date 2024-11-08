@@ -3,15 +3,12 @@ from dash import dcc, html, callback
 import pandas as pd
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
-from sqlalchemy import create_engine
 import numpy as np
-
+import psycopg2
+from psycopg2 import OperationalError
+from crate import client
 # Inicializar la app
 app = dash.Dash(__name__)
-
-# Conexión a CrateDB
-db_url = 'crate://10.38.32.137:8083/'
-engine = create_engine(db_url)
 
 username = 'julian'
 password = '123'
@@ -19,14 +16,30 @@ host = 'postgres'
 port = '5432'
 database = 'data_front'
 
-# Construye la URL de conexión
-db_url_postgresql = f'postgresql://{username}:{password}@{host}:{port}/{database}'
 
-# Crea el motor de la base de datos
-engine_postgresql = create_engine(db_url_postgresql)
+def connect_to_postgresql():
+    try:
+        connection = psycopg2.connect(
+            user=username,
+            password=password,
+            host=host,
+            port=port,
+            database=database
+        )
+        print("Conexión exitosa a PostgreSQL")
+        return connection
+    except OperationalError as e:
+        #print(f"Error al conectar a la base de datos: {e}")
+        return None
 
-# Consulta de datos históricos desde CrateDB
+
+def connect_to_crate():
+    return client.connect('http://10.38.32.137:8083', username='crate')
+
 def get_data(selected_date=None):
+    connection = connect_to_crate()
+    cursor = connection.cursor()
+
     query = """
     SELECT entity_id, time_index, temp, humedad, lat, lon
     FROM "doc"."etvariables"
@@ -41,11 +54,18 @@ def get_data(selected_date=None):
     query += " ORDER BY time_index;"
 
     try:
-        data = pd.read_sql(query, con=engine, timeout=5)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        data = pd.DataFrame(rows, columns=['entity_id','time_index', 'temp', 'humedad', 'lat', 'lon'])
     except Exception as e:
+        print(f"Error al obtener datos: {e}")
         data = pd.DataFrame()  
+    finally:
+        cursor.close()  
+        connection.close() 
 
     return data
+
 
 def create_figures(selected_date=None):
     data = get_data(selected_date)
@@ -105,37 +125,101 @@ def create_figures(selected_date=None):
 
     return temp_fig, hum_fig, last_temp, last_hum
 
+import pandas as pd
+import plotly.graph_objects as go
+from psycopg2 import connect
+
+# Función para conectarse a la base de datos
+def connect_to_postgresql():
+    username = 'julian'
+    password = '123'
+    host = 'localhost'
+    port = '5432'
+    database = 'data_front'
+
+    try:
+        connection = connect(
+            user=username,
+            password=password,
+            host=host,
+            port=port,
+            database=database
+        )
+        print("Conexión exitosa a PostgreSQL")
+        return connection
+    except Exception as e:
+        print(f"Error al conectar a la base de datos: {e}")
+        return None
+
+# Función para obtener datos de las dos tablas
 def get_prediction_data():
-    query = """
-    SELECT entity_id, time_index, predicted_temp, predicted_humedad
-    FROM "doc"."predicciones"
+    connection = connect_to_postgresql()
+    
+    if not connection:
+        return pd.DataFrame(), pd.DataFrame()  # Retornar dos DataFrames vacíos si no se conecta correctamente
+
+    # Consultas para obtener los datos de temperatura y humedad por separado
+    query_temp = """
+    SELECT entity_id, time_index, temp
+    FROM predicciones_temp
+    WHERE entity_id = 'julianor'
+    ORDER BY time_index;
+    """
+    
+    query_humidity = """
+    SELECT entity_id, time_index, humedad
+    FROM predicciones_humedad
     WHERE entity_id = 'julianor'
     ORDER BY time_index;
     """
 
     try:
-        data = pd.read_sql(query, con=engine_postgresql, timeout=5)
+        # Crear un cursor y ejecutar las dos consultas por separado
+        cursor = connection.cursor()
+        
+        # Obtener predicciones de temperatura
+        cursor.execute(query_temp)
+        rows_temp = cursor.fetchall()
+        temp_columns = ['entity_id', 'time_index', 'predicted_temp']
+        data_temp = pd.DataFrame(rows_temp, columns=temp_columns)
+        
+        # Obtener predicciones de humedad
+        cursor.execute(query_humidity)
+        rows_humidity = cursor.fetchall()
+        humidity_columns = ['entity_id', 'time_index', 'predicted_humedad']
+        data_humidity = pd.DataFrame(rows_humidity, columns=humidity_columns)
+        
+        # Cerrar el cursor
+        cursor.close()
+        
+        return data_temp, data_humidity
+
     except Exception as e:
-        data = pd.DataFrame()  # Retornar un DataFrame vacío en caso de error
+        print(f"Error al ejecutar las consultas: {e}")
+        return pd.DataFrame(), pd.DataFrame()  # En caso de error, retornar dos DataFrames vacíos
 
-    return data
+    finally:
+        connection.close()
 
+# Función para crear las gráficas de predicciones
 def create_prediction_figures():
-    data = get_prediction_data()
+    # Obtener los datos de predicción de las dos tablas
+    data_temp, data_humidity = get_prediction_data()
     
+    # Crear figuras para temperatura y humedad
     pred_temp_fig = go.Figure()
     pred_hum_fig = go.Figure()
     
-    if not data.empty:
-        data['time_index'] = pd.to_datetime(data['time_index'], unit='ms')
-        data = data.sort_values('time_index')
+    if not data_temp.empty and not data_humidity.empty:
+        # Procesar los datos de temperatura
+        data_temp['time_index'] = pd.to_datetime(data_temp['time_index'], unit='ms')
+        data_temp = data_temp.sort_values('time_index')
 
-        timestamps = data['time_index']
-        predicted_temp = data['predicted_temp']
-        predicted_humidity = data['predicted_humedad']
+        timestamps_temp = data_temp['time_index']
+        predicted_temp = data_temp['predicted_temp']
 
         # Crear la figura de temperatura
-        pred_temp_fig.add_trace(go.Scatter(x=timestamps, y=predicted_temp, mode='lines+markers', name='Predicted Temperature'))
+        pred_temp_fig.add_trace(go.Scatter(x=timestamps_temp, y=predicted_temp, mode='lines+markers', name='Predicted Temperature'))
         pred_temp_fig.update_layout(
             title='Temperatura Vs Tiempo',
             xaxis_title='Tiempo',
@@ -144,8 +228,15 @@ def create_prediction_figures():
             xaxis=dict(tickformat="%H:%M", type='date')
         )
 
+        # Procesar los datos de humedad
+        data_humidity['time_index'] = pd.to_datetime(data_humidity['time_index'], unit='ms')
+        data_humidity = data_humidity.sort_values('time_index')
+
+        timestamps_humidity = data_humidity['time_index']
+        predicted_humidity = data_humidity['predicted_humedad']
+
         # Crear la figura de humedad
-        pred_hum_fig.add_trace(go.Scatter(x=timestamps, y=predicted_humidity, mode='lines+markers', name='Predicted Humidity'))
+        pred_hum_fig.add_trace(go.Scatter(x=timestamps_humidity, y=predicted_humidity, mode='lines+markers', name='Predicted Humidity'))
         pred_hum_fig.update_layout(
             title='Humedad Vs Tiempo',
             xaxis_title='Tiempo',
@@ -154,6 +245,7 @@ def create_prediction_figures():
             xaxis=dict(tickformat="%H:%M", type='date')
         )
     else:
+        # Si los datos están vacíos, configura las gráficas con un título genérico
         pred_temp_fig.update_layout(
             title='Predicted Temperature Over Time',
             xaxis_title='Time',
@@ -169,8 +261,9 @@ def create_prediction_figures():
             xaxis_tickangle=-45,
             xaxis=dict(tickformat="%H:%M", type='date')
         )
-
+    
     return pred_temp_fig, pred_hum_fig
+
 
 
 # Layout de la app

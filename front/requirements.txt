@@ -1,7 +1,7 @@
+crate
 dash
 pandas
 plotly
-SQLAlchemy
 numpy
-crate
 geojson
+psycopg2-binary
