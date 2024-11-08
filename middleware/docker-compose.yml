@@ -13,6 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - ./job1/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - bd_network 
 
   cron:
     build:
@@ -20,3 +22,9 @@ services:
       dockerfile: dockerfile-app
     depends_on:
       - postgres
+    networks:
+      - bd_network 
+
+networks:
+  bd_network:
+    driver: bridge

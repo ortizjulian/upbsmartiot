@@ -7,3 +7,9 @@ services:
       - "5000:5000"
     volumes:
       - .:/app
+    networks:
+      - middleware_bd_network
+
+networks:
+  middleware_bd_network:
+    external: true

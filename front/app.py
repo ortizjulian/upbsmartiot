@@ -5,33 +5,11 @@ import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 import numpy as np
 import psycopg2
+from psycopg2 import connect
 from psycopg2 import OperationalError
 from crate import client
 # Inicializar la app
 app = dash.Dash(__name__)
-
-username = 'julian'
-password = '123'
-host = 'postgres'
-port = '5432'
-database = 'data_front'
-
-
-def connect_to_postgresql():
-    try:
-        connection = psycopg2.connect(
-            user=username,
-            password=password,
-            host=host,
-            port=port,
-            database=database
-        )
-        print("Conexión exitosa a PostgreSQL")
-        return connection
-    except OperationalError as e:
-        #print(f"Error al conectar a la base de datos: {e}")
-        return None
-
 
 def connect_to_crate():
     return client.connect('http://10.38.32.137:8083', username='crate')
@@ -124,20 +102,18 @@ def create_figures(selected_date=None):
         )
 
     return temp_fig, hum_fig, last_temp, last_hum
-
-import pandas as pd
-import plotly.graph_objects as go
-from psycopg2 import connect
-
 # Función para conectarse a la base de datos
 def connect_to_postgresql():
+    print('hola1')
+
     username = 'julian'
     password = '123'
-    host = 'localhost'
+    host = 'middleware_postgres'
     port = '5432'
     database = 'data_front'
 
     try:
+        print('hola2')
         connection = connect(
             user=username,
             password=password,
@@ -153,8 +129,9 @@ def connect_to_postgresql():
 
 # Función para obtener datos de las dos tablas
 def get_prediction_data():
+    print('hola3')
     connection = connect_to_postgresql()
-    
+    print('hola4')
     if not connection:
         return pd.DataFrame(), pd.DataFrame()  # Retornar dos DataFrames vacíos si no se conecta correctamente
 
@@ -263,8 +240,6 @@ def create_prediction_figures():
         )
     
     return pred_temp_fig, pred_hum_fig
-
-
 
 # Layout de la app
 app.layout = html.Div([
