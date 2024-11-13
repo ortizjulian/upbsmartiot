@@ -35,6 +35,7 @@ def get_data(selected_date=None):
         cursor.execute(query)
         rows = cursor.fetchall()
         data = pd.DataFrame(rows, columns=['entity_id','time_index', 'temp', 'humedad', 'lat', 'lon'])
+        data = remove_outliners(data)
     except Exception as e:
         print(f"Error al obtener datos: {e}")
         data = pd.DataFrame()  
@@ -44,6 +45,10 @@ def get_data(selected_date=None):
 
     return data
 
+def remove_outliners(df):
+    df = df[(df['temp'] > 0) & (df['temp'] < 100) &
+             (df['humedad'] > 0) & (df['humedad'] < 100)]
+    return df
 
 def create_figures(selected_date=None):
     data = get_data(selected_date)
@@ -104,16 +109,14 @@ def create_figures(selected_date=None):
     return temp_fig, hum_fig, last_temp, last_hum
 # Función para conectarse a la base de datos
 def connect_to_postgresql():
-    print('hola1')
 
     username = 'julian'
     password = '123'
-    host = 'middleware_postgres'
+    host = 'localhost'
     port = '5432'
     database = 'data_front'
 
     try:
-        print('hola2')
         connection = connect(
             user=username,
             password=password,
@@ -129,9 +132,8 @@ def connect_to_postgresql():
 
 # Función para obtener datos de las dos tablas
 def get_prediction_data():
-    print('hola3')
     connection = connect_to_postgresql()
-    print('hola4')
+
     if not connection:
         return pd.DataFrame(), pd.DataFrame()  # Retornar dos DataFrames vacíos si no se conecta correctamente
 
@@ -168,7 +170,7 @@ def get_prediction_data():
         
         # Cerrar el cursor
         cursor.close()
-        
+
         return data_temp, data_humidity
 
     except Exception as e:

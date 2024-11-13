@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 from crate import client
-from datetime import timedelta
+from datetime import datetime, timedelta
 from skforecast.ForecasterAutoreg import ForecasterAutoreg
 from sklearn.ensemble import RandomForestRegressor
+import psycopg2
 
 def connect_to_crate():
     return client.connect('http://10.38.32.137:8083', username='crate')
@@ -30,7 +31,7 @@ def fetch_data(mock=False):
             SELECT time_index, temp, humedad
             FROM "doc"."etvariables"
             WHERE entity_id = 'julianor'
-              AND time_index >= NOW() - INTERVAL '3 DAYS'
+              AND time_index >= NOW() - INTERVAL '10 DAYS'
             ORDER BY time_index
             """
             cursor.execute(query)
@@ -44,6 +45,10 @@ def fetch_data(mock=False):
     df = remove_outliners(df)
     return df
 
+def remove_outliners(df):
+    df = df[(df['valor_temp'] > 0) & (df['valor_temp'] < 100) &
+             (df['valor_humedad'] > 0) & (df['valor_humedad'] < 100)]
+    return df
 
 def save_predictions(predictions_temp, predictions_humedad,horas_prediccion):
     conn = psycopg2.connect(
@@ -111,7 +116,7 @@ def save_predictions(predictions_temp, predictions_humedad, horas_prediccion):
         conn.close()
 
 # Obtener y preparar los datos
-datos = fetch_data(mock=True)
+datos = fetch_data()
 datos["fecha"] = pd.to_datetime(datos["timestamp"], unit="ms")
 datos = datos.sort_values("fecha", ascending=True).reset_index(drop=True)
 datos["minutos"] = (datos["fecha"] - datos["fecha"].min()).dt.total_seconds() / 60
